@@ -1,14 +1,23 @@
 #!/bin/bash
 
 MISP_APP_CONFIG_PATH=/var/www/MISP/app/Config
-[ -z "$MYSQL_HOST" ] && MYSQL_HOST=db
-[ -z "$MYSQL_PORT" ] && MYSQL_PORT=3306
-[ -z "$MYSQL_USER" ] && MYSQL_USER=misp
-[ -z "$MYSQL_PASSWORD" ] && MYSQL_PASSWORD=example
-[ -z "$MYSQL_DATABASE" ] && MYSQL_DATABASE=misp
+# [ -z "$MYSQL_HOST" ] && MYSQL_HOST=db
+# [ -z "$MYSQL_PORT" ] && MYSQL_PORT=3306
+# [ -z "$MYSQL_USER" ] && MYSQL_USER=misp
+# [ -z "$MYSQL_PASSWORD" ] && MYSQL_PASSWORD=example
+# [ -z "$MYSQL_DATABASE" ] && MYSQL_DATABASE=misp
 [ -z "$REDIS_FQDN" ] && REDIS_FQDN=redis
 [ -z "$MISP_MODULES_FQDN" ] && MISP_MODULES_FQDN="http://misp-modules"
-[ -z "$MYSQLCMD" ] && MYSQLCMD="mysql -u $MYSQL_USER -p$MYSQL_PASSWORD -P $MYSQL_PORT -h $MYSQL_HOST -r -N  $MYSQL_DATABASE"
+# [ -z "$MYSQLCMD" ] && MYSQLCMD="mysql -u $MYSQL_USER -p$MYSQL_PASSWORD -P $MYSQL_PORT -h $MYSQL_HOST -r -N  $MYSQL_DATABASE"
+
+DATASOURCE=Database/Postgres
+PG_HOST=misp-test-db.c7tp8qzbd8vx.ap-southeast-1.rds.amazonaws.com
+PG_PORT=5432
+PG_USER=postgres
+PG_PASSWORD=Adminmisp123!!
+PG_DATABASE=""
+PGCMD=PGPASSWORD=$PG_PASSWORD psql -U $PG_USER -h $PG_HOST -p $PG_PORT -d $PG_DATABASE -c
+
 
 ENTRYPOINT_PID_FILE="/entrypoint_apache.install"
 [ ! -f $ENTRYPOINT_PID_FILE ] && touch $ENTRYPOINT_PID_FILE
@@ -26,11 +35,18 @@ init_misp_config(){
     [ -f $MISP_APP_CONFIG_PATH/email.php ] || cp $MISP_APP_CONFIG_PATH.dist/email.php $MISP_APP_CONFIG_PATH/email.php
     [ -f $MISP_APP_CONFIG_PATH/routes.php ] || cp $MISP_APP_CONFIG_PATH.dist/routes.php $MISP_APP_CONFIG_PATH/routes.php
 
-    echo "Configure MISP | Set DB User, Password and Host in database.php"
-    sed -i "s/localhost/$MYSQL_HOST/" $MISP_APP_CONFIG_PATH/database.php
-    sed -i "s/db\s*login/$MYSQL_USER/" $MISP_APP_CONFIG_PATH/database.php
-    sed -i "s/db\s*password/$MYSQL_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
-    sed -i "s/'database' => 'misp'/'database' => '$MYSQL_DATABASE'/" $MISP_APP_CONFIG_PATH/database.php
+    # echo "Configure MISP | Set DB User, Password and Host in database.php"
+    # sed -i "s/localhost/$MYSQL_HOST/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/db\s*login/$MYSQL_USER/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/db\s*password/$MYSQL_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/'database' => 'misp'/'database' => '$MYSQL_DATABASE'/" $MISP_APP_CONFIG_PATH/database.
+    
+    echo "Configure MISP | Set POSTGRESQL DB User, Password and Host in database.php"
+    sed -i "s#'datasource' => 'Database/Mysql'#'datasource' => '$DATASOURCE'#" $MISP_APP_CONFIG_PATH/database.php
+    sed -i "s/localhost/$PG_HOST/" $MISP_APP_CONFIG_PATH/database.php
+    sed -i "s/db\s*login/$PG_USER/" $MISP_APP_CONFIG_PATH/database.php
+    sed -i "s/db\s*password/$PG_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
+    sed -i "s/'database' => 'misp'/'database' => '$PG_DATABASE'/" $MISP_APP_CONFIG_PATH/database.php
 
     echo "Configure sane defaults"
     /var/www/MISP/app/Console/cake Admin setSetting "MISP.redis_host" "$REDIS_FQDN"
@@ -72,38 +88,38 @@ init_ssl() {
     fi
 }
 
-init_mysql(){
-    # Test when MySQL is ready....
-    # wait for Database come ready
-    isDBup () {
-        echo "SHOW STATUS" | $MYSQLCMD 1>/dev/null
-        echo $?
-    }
+# init_mysql(){
+#     # Test when MySQL is ready....
+#     # wait for Database come ready
+#     isDBup () {
+#         echo "SHOW STATUS" | $MYSQLCMD 1>/dev/null
+#         echo $?
+#     }
 
-    isDBinitDone () {
-        # Table attributes has existed since at least v2.1
-        echo "DESCRIBE attributes" | $MYSQLCMD 1>/dev/null
-        echo $?
-    }
+#     isDBinitDone () {
+#         # Table attributes has existed since at least v2.1
+#         echo "DESCRIBE attributes" | $MYSQLCMD 1>/dev/null
+#         echo $?
+#     }
 
-    RETRY=100
-    until [ $(isDBup) -eq 0 ] || [ $RETRY -le 0 ] ; do
-        echo "Waiting for database to come up"
-        sleep 5
-        RETRY=$(( RETRY - 1))
-    done
-    if [ $RETRY -le 0 ]; then
-        >&2 echo "Error: Could not connect to Database on $MYSQL_HOST:$MYSQL_PORT"
-        exit 1
-    fi
+#     RETRY=100
+#     until [ $(isDBup) -eq 0 ] || [ $RETRY -le 0 ] ; do
+#         echo "Waiting for database to come up"
+#         sleep 5
+#         RETRY=$(( RETRY - 1))
+#     done
+#     if [ $RETRY -le 0 ]; then
+#         >&2 echo "Error: Could not connect to Database on $MYSQL_HOST:$MYSQL_PORT"
+#         exit 1
+#     fi
 
-    if [ $(isDBinitDone) -eq 0 ]; then
-        echo "Database has already been initialized"
-    else
-        echo "Database has not been initialized, importing MySQL scheme..."
-        $MYSQLCMD < /var/www/MISP/INSTALL/MYSQL.sql
-    fi
-}
+#     if [ $(isDBinitDone) -eq 0 ]; then
+#         echo "Database has already been initialized"
+#     else
+#         echo "Database has not been initialized, importing MySQL scheme..."
+#         $MYSQLCMD < /var/www/MISP/INSTALL/MYSQL.sql
+#     fi
+# }
 
 sync_files(){
     for DIR in $(ls /var/www/MISP/app/files.dist); do
@@ -122,7 +138,7 @@ done
 
 # Things we should do when we have the INITIALIZE Env Flag
 if [[ "$INIT" == true ]]; then
-    echo "Setup MySQL..." && init_mysql
+    # echo "Setup MySQL..." && init_mysql
     echo "Setup MISP files dir..." && init_misp_files
     echo "Ensure SSL certs exist..." && init_ssl
 fi

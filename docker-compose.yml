@@ -8,25 +8,26 @@ services:
   redis:
     image: redis:5.0.6
 
-  db:
-    image: mysql:8.0.19
-    command: --default-authentication-plugin=mysql_native_password
-    restart: always
-    environment:
-      - "MYSQL_USER=misp"
-      - "MYSQL_PASSWORD=example"
-      - "MYSQL_ROOT_PASSWORD=password"
-      - "MYSQL_DATABASE=misp"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    cap_add:
-      - SYS_NICE  # CAP_SYS_NICE Prevent runaway mysql log
+  # REMOVED BECAUSE USING REMOTE RDS POSTGRESQL DB
+  # db:
+  #   image: mysql:8.0.19
+  #   command: --default-authentication-plugin=mysql_native_password
+  #   restart: always
+  #   environment:
+  #     - "MYSQL_USER=misp"
+  #     - "MYSQL_PASSWORD=example"
+  #     - "MYSQL_ROOT_PASSWORD=password"
+  #     - "MYSQL_DATABASE=misp"
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   cap_add:
+  #     - SYS_NICE  # CAP_SYS_NICE Prevent runaway mysql log
 
   misp:
     image: coolacid/misp-docker:core-latest
     depends_on:
       - redis
-      - db
+      # - db
     ports:
       - "80:80"
       - "443:443"
@@ -39,7 +40,7 @@ services:
     environment:
       - "HOSTNAME=https://localhost"
       - "REDIS_FQDN=redis"
-      - "INIT=true"             # Initialze MISP, things includes, attempting to import SQL and the Files DIR
+      - "INIT=false"             # Initialze MISP, things includes, attempting to import SQL and the Files DIR
       - "CRON_USER_ID=1"        # The MISP user ID to run cron jobs as
 #      - "SYNCSERVERS=1 2 3 4"  # The MISP Feed servers to sync in the cron job
       # Database Configuration (And their defaults)
@@ -60,7 +61,7 @@ services:
       - "REDIS_BACKEND=redis"
     depends_on:
       - redis
-      - db
+      # - db
 
-volumes:
-    mysql_data:
+# volumes:
+#     mysql_data:
